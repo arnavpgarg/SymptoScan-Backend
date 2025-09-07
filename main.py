@@ -13,6 +13,7 @@ from models import (
 )
 from database import supabase_client
 from services import llm_service, pdf_parser, tts_service
+from document_parser import advanced_parser
 
 app = FastAPI(
     title="SymptoScan API",
@@ -118,9 +119,20 @@ async def summarize_report(request: SummarizeReportRequest):
             if hasattr(file_response, 'error') and file_response.error:
                 raise HTTPException(status_code=500, detail=f"Failed to download file: {file_response.error}")
             
-            # Parse PDF if needed
+            # Generate signed URL for advanced parsing APIs
+            signed_url = None
+            try:
+                signed_url = await advanced_parser.get_signed_url_from_supabase(supabase, document["storage_url"])
+            except Exception as e:
+                print(f"Failed to generate signed URL: {e}")
+            
+            # Parse document using advanced methods
             if document["filename"].lower().endswith('.pdf'):
-                text_to_analyze = pdf_parser.parse_pdf(file_response)
+                text_to_analyze = await pdf_parser.parse_pdf(
+                    file_response, 
+                    document["filename"], 
+                    signed_url
+                )
             else:
                 text_to_analyze = file_response.decode('utf-8')
                 
